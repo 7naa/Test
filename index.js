@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const uri = "mongodb+srv://liyana:1234@test.4ji6o.mongodb.net/?retryWrites=true&w=majority&appName=Test";
+const uri = "mongodb+srv://liyana:liyana1234@test.4ji6o.mongodb.net/?retryWrites=true&w=majority&appName=Test";
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -96,7 +96,7 @@ app.post('/admin/register', verifyToken, verifyAdmin, async (req, res) => {
   
       const hash = bcrypt.hashSync(password, 15);
   
-      const result = await client.db("admin").collection("data").insertOne({
+      const result = await client.db("game").collection("admin").insertOne({
         username,
         password: hash
       });
