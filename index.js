@@ -1,40 +1,23 @@
 const express = require('express')
 const app = express()
-const port = process.env.PORT||3000;
+const port = process.env.PORT||5000;
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
 const { MongoClient, ServerApiVersion } = require('mongodb');
-const uri = "mongodb+srv://liyana:liyana1234@test.4ji6o.mongodb.net/?retryWrites=true&w=majority&appName=Test";
 
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
-
-async function run() {
-    try {
-      // Connect the client to the server	(optional starting in v4.7)
-      await client.connect();
-      // Send a ping to confirm a successful connection
-      await client.db("game").command({ ping: 1 });
-      console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-      // Ensures that the client will close when you finish/error
-      await client.close();
-    }
-
+const credentials = 'X509-cert-8586207455012682246.pem'
 //Middleware to parse JSON in request body
-app.use(express.json())
+app.use(express.json());
+
+const client = new MongoClient('mongodb+srv://test.4ji6o.mongodb.net/?authSource=%24external&authMechanism=MONGODB-X509&retryWrites=true&w=majority&appName=Test', {
+  tlsCertificateKeyFile: credentials,
+  serverApi: ServerApiVersion.v1
+});
 
 //Function to verify JWT token
 function verifyToken(req, res, next) {
     const authHeader = req.headers.authorization;
-    const token = authHeader && authHeaader.split(' ')[1];
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (token == null) return res.sendStatus(401);
 
@@ -318,9 +301,21 @@ app.get('/hai',(req, res) => {
     res.send('Hello World')
 })
 
-}
-run().catch(console.dir);
-
 app.listen(port, () => {
-    console.log('Example app listening on port ${port}')
-})
+    console.log(`Example app listening on port ${port}`);
+});
+
+async function run() {
+    try {
+      await client.connect();
+      const database = client.db("testDB");
+      const collection = database.collection("testCol");
+      const docCount = await collection.countDocuments({});
+      console.log(docCount);
+      // perform actions using client
+    } finally {
+      // Ensures that the client will close when you finish/error
+      await client.close();
+    }
+  }
+  run().catch(console.dir);
