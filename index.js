@@ -16,6 +16,18 @@ const client = new MongoClient(uri, {
   }
 });
 
+async function run() {
+    try {
+      // Connect the client to the server	(optional starting in v4.7)
+      await client.connect();
+      // Send a ping to confirm a successful connection
+      await client.db("game").command({ ping: 1 });
+      console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    } finally {
+      // Ensures that the client will close when you finish/error
+      await client.close();
+    }
+
 //Middleware to parse JSON in request body
 app.use(express.json())
 
@@ -108,7 +120,7 @@ app.post('/admin/register', verifyToken, verifyAdmin, async (req, res) => {
     }
   });
 
-  // Admin login
+// Admin login
 app.post('/admin/login', async (req, res) => {
     const { username, password } = req.body;
   
@@ -140,23 +152,174 @@ app.post('/admin/login', async (req, res) => {
     }
   });
 
+// Get all user profiles (Admin only)
+app.get('/admin/users', verifyToken, verifyAdmin, async (req, res) => {
+    try {
+      const users = await client.db("game").collection("user").find({}).toArray();
+      res.send(users);
+    } catch (error) {
+      console.error("Error fetching all users:", error);
+      res.status(500).send("Internal Server Error");
+    }
+  });
+  
+// Delete user profile (Admin only)
+app.delete('/admin/user/:id', verifyToken, verifyAdmin, async (req, res) => {
+    const userId = req.params.id;
+  
+    try {
+      const result = await client.db("game").collection("user").deleteOne({ _id: new ObjectId(userId) });
+  
+      if (result.deletedCount === 0) {
+        return res.status(404).send("User not found");
+      }
+  
+      res.send("User deleted successfully");
+    } catch (error) {
+      console.error("Error deleting user profile:", error);
+      res.status(500).send("Internal Server Error");
+    }
+  });
+  
+// User registration
+app.post('/user', async (req, res) => {
+    const { username, password, name, email } = req.body;
+  
+    if (!username || !password || !name || !email) {
+      return res.status(400).send("All fields are required");
+    }
+  
+    if (password.length < 8) {
+      return res.status(400).send("Password must be at least 8 characters long.");
+    }
+  
+    try {
+      const existingUser = await client.db("game").collection("user").findOne({ username });
+      if (existingUser) {
+        return res.status(400).send("Username already exists.");
+      }
+  
+      const hash = bcrypt.hashSync(password, 15);
+  
+      const result = await client.db("game").collection("user").insertOne({
+        username,
+        password: hash,
+        name,
+        email
+      });
+      res.send(result);
+    } catch (error) {
+      console.error("Error during user registration:", error);
+      res.status(500).send("Internal Server Error");
+    }
+  });
+  
+// User login
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+  
+    if (!username || !password) {
+      return res.status(400).send("Missing username or password");
+    }
+  
+    try {
+      const user = await client.db("game").collection("user").findOne({ username });
+  
+      if (!user) {
+        return res.status(401).send("-");
+      }
+  
+      const isPasswordValid = bcrypt.compareSync(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).send("Wrong password! Try again");
+      }
+  
+      const token = jwt.sign(
+        { _id: user._id, username: user.username, name: user.name, role: "user" },
+        'passgroupj'
+      );
+  
+      res.send({ _id: user._id, token, role: "user" });
+    } catch (error) {
+      console.error("Error during user login:", error);
+      res.status(500).send("Internal Server Error");
+    }
+  });
+  
+// Get user profile
+app.get('/user/:id', verifyToken, async (req, res) => {
+    if (req.identity._id != req.params.id) {
+      return res.status(401).send('Unauthorized access');
+    }
+  
+    let result = await client.db("game").collection("user").findOne({
+      _id: new ObjectId(req.params.id)
+    });
+    res.send(result);
+  });
+  
+  
+app.post('/buy', async (req, res) => {
+    const token = req.headers.authorization.split(" ")[1];
+    var decoded = jwt.verify(token, 'passgroupj');
+    console.log(decoded);
+  });
+  const fs = require('fs');
+  const path = require('path');
+  
+// Choose map - Authenticated route
+app.post('/choose-map', verifyToken, (req, res) => {
+    const selectedMapName = req.body.selectedMap;
+  
+    function mapJsonPathExists(mapPath) {
+      try {
+        fs.accessSync(mapPath, fs.constants.F_OK);
+        return true;
+      } catch (err) {
+        return false;
+      }
+    }
+  
+    const mapJsonPath = `./${selectedMapName}.json`;
+    if (mapJsonPathExists(mapJsonPath)) {
+      const mapData = JSON.parse(fs.readFileSync(mapJsonPath, 'utf-8'));
+      req.identity.selectedMap = selectedMapName; // Store the selected map in the JWT
+      req.identity.playerPosition = mapData.playerLoc; // Set initial player position
+      const room1Message = mapData.map.room1.message;
+  
+      res.send(`You choose ${selectedMapName}. Let's start playing!\n\nRoom 1 Message:\n${room1Message}`);
+    } else {
+      res.status(404).send(`Map "${selectedMapName}" not found.`);
+    }
+  });
+
+// Move - Authenticated route
+app.patch('/move', verifyToken, (req, res) => {
+    const direction = req.body.direction;
+  
+    if (!req.identity.selectedMap) {
+      return res.status(400).send("No map selected.");
+    }
+    const mapData = require(`./${req.identity.selectedMap}.json`);
+    const currentRoom = mapData.map[req.identity.playerPosition];
+  
+    const nextRoom = currentRoom[direction];
+    if (!nextRoom) {
+      return res.status(400).send(`Invalid direction: ${direction}`);
+    }
+  
+    const nextRoomMessage = mapData.map[nextRoom].message;
+    req.identity.playerPosition = nextRoom;
+  
+    res.send(`You moved ${direction}. ${nextRoomMessage}`);
+  });
+  
 app.get('/hai',(req, res) => {
     res.send('Hello World')
 })
 
-async function run() {
-    try {
-      // Connect the client to the server	(optional starting in v4.7)
-      await client.connect();
-      // Send a ping to confirm a successful connection
-      await client.db("game").command({ ping: 1 });
-      console.log("Pinged your deployment. You successfully connected to MongoDB!");
-    } finally {
-      // Ensures that the client will close when you finish/error
-      await client.close();
-    }
-  }
-  run().catch(console.dir);
+}
+run().catch(console.dir);
 
 app.listen(port, () => {
     console.log('Example app listening on port ${port}')
