@@ -123,7 +123,7 @@ app.post('/admin/register', verifyToken, verifyAdmin, async (req, res) => {
   });
 
   // Admin login
-app.post('/admin/login', async (req, res) => {
+app.post('/admin/login',async(req, res) => {
     const { username, password } = req.body;
   
     if (!username || !password) {
@@ -154,7 +154,7 @@ app.post('/admin/login', async (req, res) => {
     }
   });
 
-app.get('/',(req, res) => {
+app.get('/hai',(req, res) => {
     res.send('Hello World')
 })
 
