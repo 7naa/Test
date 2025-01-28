@@ -15,13 +15,6 @@ const client = new MongoClient(
   }
 );
 
-// Middleware to parse JSON in the request body
-app.use(express.json());
-
-app.get('/',(req,res) => {
-  res.send('hello')
-});
-
 // Function to verify JWT token
 function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -78,6 +71,13 @@ app.post('/initialize-admin', async (req, res) => {
     console.error("Error during admin initialization:", error);
     res.status(500).send("Internal Server Error");
   }
+});
+
+// Middleware to parse JSON in the request body
+app.use(express.json());
+
+app.get('/',(req,res) => {
+  res.send('hello')
 });
 
 // Admin login
